@@ -29,7 +29,8 @@ class WordPressSource {
       typeName: 'WordPress',
       images: false,
       content: true,
-      verbose: false
+      verbose: false,
+      ignoreSSL: false
     }
   }
 
@@ -67,7 +68,8 @@ class WordPressSource {
       prefixUrl: clientBase,
       searchParams: { per_page: this.options.perPage },
       resolveBodyOnly: true,
-      responseType: 'json'
+      responseType: 'json',
+      https: { rejectUnauthorized: !this.options.ignoreSSL }
     })
 
     api.loadSource(async actions => {
