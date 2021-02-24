@@ -1,3 +1,4 @@
+/* eslint-disable no-prototype-builtins */
 const HTMLParser = require('node-html-parser')
 const camelCase = require('camelcase')
 const consola = require('consola')
@@ -216,7 +217,7 @@ class WordPressSource {
         for (const type in this.restBases.taxonomies) {
           const propName = this.restBases.taxonomies[ type ]
 
-          if (post[ propName ]) {
+          if (post.hasOwnProperty(propName)) {
             const typeName = this.createTypeName(type)
             const key = camelCase(propName)
 
@@ -383,7 +384,7 @@ class WordPressSource {
         const id = value.ID || value.id
 
         return this.store.createReference(typeName, id)
-      } else if (value.rendered) {
+      } else if (value.hasOwnProperty('rendered')) {
         return value.rendered
       }
 
