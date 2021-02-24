@@ -1,8 +1,9 @@
 {
   "version": "0.5.4",
-  "name": "@thetre97/gridsome-source-wordpress",
+  "name": "@travisreynolds/gridsome-source-wordpress",
   "description": "WordPress source for Gridsome",
   "repository": "https://github.com/thetre97/gridsome-source-wordpress",
+  "private": false,
   "main": "index.js",
   "dependencies": {
     "camelcase": "^6.2.0",
