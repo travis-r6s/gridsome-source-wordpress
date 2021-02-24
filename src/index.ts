@@ -27,11 +27,11 @@ interface PluginOptions {
   apiBase: string
   baseUrl: string
   concurrent: number
-  content: boolean | { links: boolean, images: boolean }
+  content: { links: boolean, images: boolean }
   customEndpoints: CustomEndpointOption[]
   hostingWPCOM: boolean
   ignoreSSL: boolean
-  images: boolean
+  images: boolean | { original: boolean, folder: string, cache: boolean, concurrent: number }
   perPage: number
   typeName: string
   verbose: boolean
@@ -63,7 +63,7 @@ class WordPressSource {
       apiBase: 'wp-json',
       baseUrl: '',
       concurrent: os.cpus().length,
-      content: true,
+      content: { images: false, links: true },
       customEndpoints: [],
       hostingWPCOM: false,
       ignoreSSL: false,
@@ -149,7 +149,7 @@ class WordPressSource {
     })
 
     api.onBootstrap(async () => {
-      await this.downloadImages()
+      if (this.options.images) await this.downloadImages()
     })
   }
 
@@ -462,7 +462,6 @@ class WordPressSource {
   }
 
   async downloadImages (): Promise<void> {
-    if (!this.options.images) return
     const { original = false, folder = '.images/wordpress', cache = true, concurrent = os.cpus().length } = this.options.images
 
     const imageStore = this.store.getCollection(this.createTypeName(TYPE_ATTACHMENT))
