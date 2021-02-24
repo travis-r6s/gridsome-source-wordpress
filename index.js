@@ -172,45 +172,7 @@ class WordPressSource {
         }
 
         if (this.options.content) {
-          const { links = true, images = true } = this.options.content
-          const fieldsToInclude = Array.isArray(links) ? ['content', ...links] : ['content']
-
-          for await (const key of fieldsToInclude) {
-            const html = HTMLParser.parse(fields[ key ])
-            if (!html) continue
-
-            if (links) {
-              for (const link of html.querySelectorAll('a')) {
-                const originalLink = link.getAttribute('href')
-                const updatedLink = originalLink.replace(this.options.baseUrl, '')
-                link.setAttribute('href', updatedLink)
-              }
-            }
-
-            if (images) {
-              const pipeline = promisify(stream.pipeline)
-              for await (const img of html.querySelectorAll('img')) {
-                const originalSrc = img.getAttribute('src')
-                if (!originalSrc.includes(this.options.baseUrl)) continue
-
-                const { pathname } = new URL(originalSrc)
-                const fileUrl = pathname.replace('/wp-content', '')
-                const filePath = path.join(process.cwd(), 'static', fileUrl)
-
-                img.setAttribute('src', fileUrl)
-
-                if (await fs.pathExists(filePath)) continue
-
-                await fs.ensureFile(filePath)
-                await pipeline(
-                  got.stream(originalSrc),
-                  fs.createWriteStream(filePath)
-                )
-              }
-            }
-
-            fields[ key ] = html.toString()
-          }
+          fields = await this.parseContent(fields)
         }
 
         // add references if post has any taxonomy rest bases as properties
@@ -286,6 +248,50 @@ class WordPressSource {
       logger.warn(`Status ${response.statusCode} fetching ${response.requestUrl}`)
       return []
     }
+  }
+
+  async parseContent (fields) {
+    const { links = true, images = true } = this.options.content
+    const fieldsToInclude = Array.isArray(links) ? ['content', ...links] : ['content']
+
+    for await (const key of fieldsToInclude) {
+      const html = HTMLParser.parse(fields[ key ])
+      if (!html) continue
+
+      if (links) {
+        for (const link of html.querySelectorAll('a')) {
+          const originalLink = link.getAttribute('href')
+          const updatedLink = originalLink.replace(this.options.baseUrl, '')
+          link.setAttribute('href', updatedLink)
+        }
+      }
+
+      if (images) {
+        const pipeline = promisify(stream.pipeline)
+        for await (const img of html.querySelectorAll('img')) {
+          const originalSrc = img.getAttribute('src')
+          if (!originalSrc.includes(this.options.baseUrl)) continue
+
+          const { pathname } = new URL(originalSrc)
+          const fileUrl = pathname.replace('/wp-content', '')
+          const filePath = path.join(process.cwd(), 'static', fileUrl)
+
+          img.setAttribute('src', fileUrl)
+
+          if (await fs.pathExists(filePath)) continue
+
+          await fs.ensureFile(filePath)
+          await pipeline(
+            got.stream(originalSrc),
+            fs.createWriteStream(filePath)
+          )
+        }
+      }
+
+      fields[ key ] = html.toString()
+    }
+
+    return fields
   }
 
   async downloadImages (api) {
