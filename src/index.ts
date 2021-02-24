@@ -22,6 +22,12 @@ interface CustomEndpointOption {
   route: string
   normalize: string
 }
+interface ImageOptions {
+  original: boolean
+  folder: string
+  cache: boolean
+  concurrent: number
+}
 
 interface PluginOptions {
   apiBase: string
@@ -31,7 +37,7 @@ interface PluginOptions {
   customEndpoints: CustomEndpointOption[]
   hostingWPCOM: boolean
   ignoreSSL: boolean
-  images: boolean | { original: boolean, folder: string, cache: boolean, concurrent: number }
+  images: ImageOptions | boolean
   perPage: number
   typeName: string
   verbose: boolean
@@ -462,7 +468,7 @@ class WordPressSource {
   }
 
   async downloadImages (): Promise<void> {
-    const { original = false, folder = '.images/wordpress', cache = true, concurrent = os.cpus().length } = this.options.images
+    const { original = false, folder = '.images/wordpress', cache = true, concurrent = os.cpus().length } = (this.options.images || {}) as ImageOptions
 
     const imageStore = this.store.getCollection(this.createTypeName(TYPE_ATTACHMENT))
     const images = imageStore.data()
