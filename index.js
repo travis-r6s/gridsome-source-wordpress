@@ -163,7 +163,7 @@ class WordPressSource {
       const data = await this.fetchPaged(restBase)
 
       for (const post of data) {
-        const fields = this.normalizeFields(post)
+        let fields = this.normalizeFields(post)
 
         fields.author = actions.createReference(AUTHOR_TYPE_NAME, post.author || '0')
 
