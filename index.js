@@ -116,7 +116,7 @@ class WordPressSource {
     for (const author of data) {
       const fields = this.normalizeFields(author)
 
-      const avatars = Object.entries(author.avatar_urls).reduce((obj, [key, value]) => ({ ...obj, [ `avatar${key}` ]: value }), {})
+      const avatars = Object.entries(author.avatar_urls || {}).reduce((obj, [key, value]) => ({ ...obj, [ `avatar${key}` ]: value }), {})
 
       authors.addNode({
         ...fields,
