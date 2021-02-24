@@ -86,7 +86,7 @@ class WordPressSource {
   options: PluginOptions
   restBases: { posts: Record<string, any>, taxonomies: Record<string, any> } = { posts: {}, taxonomies: {} }
   store: Store
-  woocommerce: Got | undefined = undefined
+  woocommerce: Got | undefined
 
   constructor (api: any, options: PluginOptions) {
     if (!options.baseUrl) {
@@ -110,9 +110,9 @@ class WordPressSource {
     const baseUrl = options.baseUrl.replace(/\/$/, '')
     const clientBase = options.hostingWPCOM ? `https://public-api.wordpress.com/wp/v2/sites/${baseUrl}/` : `${baseUrl}/${options.apiBase}/wp/v2/`
 
-    this.store = api._app.store
     this.options = { ...options, baseUrl }
     this.customEndpoints = this.sanitizeCustomEndpoints()
+    this.store = api._app.store
 
     this.client = got.extend({
       prefixUrl: clientBase,
@@ -139,6 +139,7 @@ class WordPressSource {
     api.loadSource(async (actions: Store) => {
       logger.info(`Loading data from ${this.options.baseUrl}`)
 
+      this.store = actions
       this.addSchemaTypes(actions)
 
       await this.getPostTypes(actions)
