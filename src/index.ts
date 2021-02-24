@@ -89,7 +89,6 @@ class WordPressSource {
   woocommerce: Got | undefined = undefined
 
   constructor (api: any, options: PluginOptions) {
-    logger.info('starting')
     if (!options.baseUrl) {
       logger.error(new Error('Missing the `baseUrl` option - please add, and try again.'))
     }
