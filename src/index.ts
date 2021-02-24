@@ -1,48 +1,95 @@
 /* eslint-disable no-prototype-builtins */
-const HTMLParser = require('node-html-parser')
-const camelCase = require('camelcase')
-const consola = require('consola')
-const fs = require('fs-extra')
-const got = require('got').default
-const isPlainObject = require('lodash.isplainobject')
-const os = require('os')
-const pMap = require('p-map')
-const path = require('path')
-const stream = require('stream')
-const { promisify } = require('util')
+import HTMLParser from 'node-html-parser'
+import camelCase from 'camelcase'
+import camelCaseKeys from 'camelcase-keys'
+import consola from 'consola'
+import fs from 'fs-extra'
+import got, { Got } from 'got'
+import isPlainObject from 'lodash.isplainobject'
+import os from 'os'
+import pMap from 'p-map'
+import path from 'path'
+import stream from 'stream'
+import { promisify } from 'util'
 
 const TYPE_AUTHOR = 'author'
 const TYPE_ATTACHMENT = 'attachment'
 
-const logger = consola.create({
-  defaults: { tag: '@gridsome/source-wordpress' }
-})
+const logger = consola.withTag('gridsome-source-wordpress')
+
+interface CustomEndpointOption {
+  typeName: string
+  route: string
+  normalize: string
+}
+
+interface PluginOptions {
+  apiBase: string
+  baseUrl: string
+  concurrent: number
+  content: boolean | { links: boolean, images: boolean }
+  customEndpoints: CustomEndpointOption[]
+  hostingWPCOM: boolean
+  ignoreSSL: boolean
+  images: boolean
+  perPage: number
+  typeName: string
+  verbose: boolean
+  woocommerce: { consumerKey: string, consumerSecret: string } | null
+}
+
+interface Store {
+  addCollection: (typeName: string) => Collection
+  addSchemaTypes: (schema: string) => void
+  createReference: (typeName: string, id: string) => NodeReference
+  getCollection: (typeName: string) => Collection
+}
+
+interface Collection {
+  addNode: (node: any) => void
+  addReference: (field: string, typeName: string) => void
+  data: () => any[]
+  updateNode: (node: any) => void
+}
+
+interface NodeReference {
+  id: string
+  typeName: string
+}
 
 class WordPressSource {
-  static defaultOptions () {
+  static defaultOptions (): PluginOptions {
     return {
-      baseUrl: '',
-      replaceUrl: '',
       apiBase: 'wp-json',
-      hostingWPCOM: false,
-      perPage: 100,
+      baseUrl: '',
       concurrent: os.cpus().length,
-      typeName: 'WordPress',
-      images: false,
       content: true,
-      verbose: false,
+      customEndpoints: [],
+      hostingWPCOM: false,
       ignoreSSL: false,
-      woocommerce: false
+      images: false,
+      perPage: 100,
+      typeName: 'WordPress',
+      verbose: false,
+      woocommerce: null
     }
   }
 
-  constructor (api, options) {
+  client: Got
+  customEndpoints: CustomEndpointOption[]
+  options: PluginOptions
+  restBases: { posts: Record<string, any>, taxonomies: Record<string, any> } = { posts: {}, taxonomies: {} }
+  store: Store
+  woocommerce: Got | undefined = undefined
+
+  constructor (api: any, options: PluginOptions) {
+    logger.info('starting')
     if (!options.baseUrl) {
-      throw new Error(logger.error('Missing the `baseUrl` option - please add, and try again.'))
+      logger.error(new Error('Missing the `baseUrl` option - please add, and try again.'))
     }
 
     if (!options.baseUrl.includes('http') && !options.hostingWPCOM) {
-      throw new Error(logger.error('`baseUrl` does not include the protocol - please add, and try again (`http://` or `https://`).'))
+      logger.error(new Error('`baseUrl` does not include the protocol - please add, and try again (`http://` or `https://`).'))
     }
 
     if (!options.typeName) {
@@ -58,12 +105,8 @@ class WordPressSource {
     const baseUrl = options.baseUrl.replace(/\/$/, '')
     const clientBase = options.hostingWPCOM ? `https://public-api.wordpress.com/wp/v2/sites/${baseUrl}/` : `${baseUrl}/${options.apiBase}/wp/v2/`
 
-    this.options = {
-      ...options,
-      baseUrl
-    }
-    this.restBases = { posts: {}, taxonomies: {} }
-
+    this.store = api._app.store
+    this.options = { ...options, baseUrl }
     this.customEndpoints = this.sanitizeCustomEndpoints()
 
     this.client = got.extend({
@@ -88,9 +131,7 @@ class WordPressSource {
       })
     }
 
-    api.loadSource(async actions => {
-      this.store = actions
-
+    api.loadSource(async (actions: Store) => {
       logger.info(`Loading data from ${this.options.baseUrl}`)
 
       this.addSchemaTypes(actions)
@@ -108,11 +149,11 @@ class WordPressSource {
     })
 
     api.onBootstrap(async () => {
-      this.downloadImages(api)
+      await this.downloadImages()
     })
   }
 
-  addSchemaTypes (actions) {
+  addSchemaTypes (actions: Store): void {
     actions.addSchemaTypes(`
       type ${this.createTypeName(TYPE_ATTACHMENT)} implements Node @infer {
         downloaded: Image
@@ -120,8 +161,8 @@ class WordPressSource {
     `)
   }
 
-  async getPostTypes (actions) {
-    if (this.options.verbose) logger.info(`Fetching types`)
+  async getPostTypes (actions: Store): Promise<void> {
+    if (this.options.verbose) logger.info('Fetching types')
 
     const data = await this.fetch('types', {}, {})
 
@@ -130,16 +171,16 @@ class WordPressSource {
 
       if (this.options.verbose) logger.info(`Fetching ${type}s`)
 
-      const options = data[ type ]
+      const options = data[type]
 
-      this.restBases.posts[ type ] = options.rest_base
+      this.restBases.posts[type] = options.rest_base
 
       actions.addCollection(this.createTypeName(type))
     }
   }
 
-  async getUsers (actions) {
-    if (this.options.verbose) logger.info(`Fetching users`)
+  async getUsers (actions: Store): Promise<void> {
+    if (this.options.verbose) logger.info('Fetching users')
 
     const data = await this.fetch('users')
 
@@ -148,7 +189,7 @@ class WordPressSource {
     for (const author of data) {
       const fields = this.normalizeFields(author)
 
-      const avatars = Object.entries(author.avatar_urls || {}).reduce((obj, [key, value]) => ({ ...obj, [ `avatar${key}` ]: value }), {})
+      const avatars = Object.entries(author.avatar_urls || {}).reduce((obj, [key, value]) => ({ ...obj, [`avatar${key}`]: value }), {})
 
       authors.addNode({
         ...fields,
@@ -159,18 +200,18 @@ class WordPressSource {
     }
   }
 
-  async getTaxonomies (actions) {
-    if (this.options.verbose) logger.info(`Fetching taxonomies`)
+  async getTaxonomies (actions: Store): Promise<void> {
+    if (this.options.verbose) logger.info('Fetching taxonomies')
 
     const data = await this.fetch('taxonomies', {}, {})
 
     for (const type in data) {
       if (this.options.verbose) logger.info(`Fetching ${type} taxonomy type`)
 
-      const options = data[ type ]
+      const options = data[type]
       const taxonomy = actions.addCollection(this.createTypeName(type))
 
-      this.restBases.taxonomies[ type ] = options.rest_base
+      this.restBases.taxonomies[type] = options.rest_base
 
       const terms = await this.fetchPaged(options.rest_base)
 
@@ -187,14 +228,14 @@ class WordPressSource {
     }
   }
 
-  async getPosts (actions) {
+  async getPosts (actions: Store): Promise<void> {
     const AUTHOR_TYPE_NAME = this.createTypeName(TYPE_AUTHOR)
     const ATTACHMENT_TYPE_NAME = this.createTypeName(TYPE_ATTACHMENT)
 
     for (const type in this.restBases.posts) {
       if (this.options.verbose) logger.info(`Fetching ${type} post type`)
 
-      const restBase = this.restBases.posts[ type ]
+      const restBase = this.restBases.posts[type]
       const typeName = this.createTypeName(type)
       const posts = actions.getCollection(typeName)
 
@@ -214,15 +255,15 @@ class WordPressSource {
 
         // add references if post has any taxonomy rest bases as properties
         for (const type in this.restBases.taxonomies) {
-          const propName = this.restBases.taxonomies[ type ]
+          const propName = this.restBases.taxonomies[type]
 
           if (post.hasOwnProperty(propName)) {
             const typeName = this.createTypeName(type)
             const key = camelCase(propName)
 
-            fields[ key ] = Array.isArray(post[ propName ])
-              ? post[ propName ].map(id => actions.createReference(typeName, id))
-              : actions.createReference(typeName, post[ propName ])
+            fields[key] = Array.isArray(post[propName])
+              ? post[propName].map((id: string) => actions.createReference(typeName, id))
+              : actions.createReference(typeName, post[propName])
           }
         }
 
@@ -231,7 +272,7 @@ class WordPressSource {
     }
   }
 
-  async getCustomEndpoints (actions) {
+  async getCustomEndpoints (actions: Store): Promise<void> {
     for (const endpoint of this.customEndpoints) {
       if (this.options.verbose) logger.info(`Fetching custom ${endpoint.typeName} type`)
 
@@ -252,8 +293,8 @@ class WordPressSource {
     }
   }
 
-  async getWooCommerceProducts (actions) {
-    if (this.options.verbose) logger.info(`Fetching WooCommerce products`)
+  async getWooCommerceProducts (actions: Store): Promise<void> {
+    if (this.options.verbose) logger.info('Fetching WooCommerce products')
 
     const ATTACHMENT_TYPE_NAME = this.createTypeName(TYPE_ATTACHMENT)
     const CATEGORY_TYPE_NAME = this.createTypeName('ProductCategory')
@@ -276,12 +317,12 @@ class WordPressSource {
         fields = await this.parseContent(fields)
       }
 
-      const categories = fields.categories.map(category => actions.createReference(CATEGORY_TYPE_NAME, category.id))
-      const images = fields.images.map(image => actions.createReference(ATTACHMENT_TYPE_NAME, image.id))
+      const categories = fields.categories.map(({ id }: { id: string }) => actions.createReference(CATEGORY_TYPE_NAME, id))
+      const images = fields.images.map(({ id }: { id: string }) => actions.createReference(ATTACHMENT_TYPE_NAME, id))
 
-      const upsells = fields.upsellIds.map(id => actions.createReference(PRODUCT_TYPE_NAME, id))
-      const crossSells = fields.crossSellIds.map(id => actions.createReference(PRODUCT_TYPE_NAME, id))
-      const related = fields.relatedIds.map(id => actions.createReference(PRODUCT_TYPE_NAME, id))
+      const upsells = fields.upsellIds.map((id: string) => actions.createReference(PRODUCT_TYPE_NAME, id))
+      const crossSells = fields.crossSellIds.map((id: string) => actions.createReference(PRODUCT_TYPE_NAME, id))
+      const related = fields.relatedIds.map((id: string) => actions.createReference(PRODUCT_TYPE_NAME, id))
 
       productCollection.addNode({
         ...fields,
@@ -293,10 +334,10 @@ class WordPressSource {
       })
     }
 
-    if (this.options.verbose) logger.info(`Fetching WooCommerce product variations`)
+    if (this.options.verbose) logger.info('Fetching WooCommerce product variations')
 
     const allVariableProducts = products.filter(product => product.type === 'variable')
-    const allVariableProductVariations = await pMap(allVariableProducts, product => this.fetch(`products/${product.id}/variations`, {}, [], this.woocommerce), { concurrency: this.options.concurrent })
+    const allVariableProductVariations = await pMap(allVariableProducts, async ({ id }: { id: string }) => await this.fetch(`products/${id}/variations`, {}, [], this.woocommerce), { concurrency: this.options.concurrent })
 
     for (const variation of allVariableProductVariations.flat()) {
       let fields = this.normalizeFields(variation)
@@ -309,8 +350,8 @@ class WordPressSource {
     }
   }
 
-  async getWooCommerceCategories (actions) {
-    if (this.options.verbose) logger.info(`Fetching WooCommerce categories`)
+  async getWooCommerceCategories (actions: Store): Promise<void> {
+    if (this.options.verbose) logger.info('Fetching WooCommerce categories')
 
     const ATTACHMENT_TYPE_NAME = this.createTypeName(TYPE_ATTACHMENT)
     const CATEGORY_TYPE_NAME = this.createTypeName('ProductCategory')
@@ -328,7 +369,7 @@ class WordPressSource {
       const image = fields.image ? actions.createReference(ATTACHMENT_TYPE_NAME, fields.image.id) : null
 
       const products = productCollection.data()
-        .filter(({ categories }) => categories.some(({ id }) => id === category.id.toString()))
+        .filter(({ categories }) => categories.some(({ id }: { id: string }) => id === category.id.toString()))
         .map(({ id }) => actions.createReference(PRODUCT_TYPE_NAME, id))
 
       const children = categories.filter(({ parent }) => parent === category.id)
@@ -338,56 +379,57 @@ class WordPressSource {
     }
   }
 
-  async fetch (url, params = {}, fallbackData = [], client = this.client) {
+  async fetch (url: string, params: Record<string, any> = {}, fallbackData: [] | {} = [], client: Got = this.client): Promise<any> {
     try {
       const data = await client.get(url, { searchParams: params })
       return data
     } catch ({ response }) {
-      logger.warn(`Status ${response.statusCode} fetching ${response.requestUrl}`)
+      logger.warn(`Status ${response.statusCode as string} fetching ${response.requestUrl as string}`)
       return fallbackData
     }
   }
 
-  async fetchPaged (path, client = this.client) {
+  async fetchPaged (path: string, client: Got = this.client): Promise<any[]> {
     try {
       const { headers } = await client.head(path, { resolveBodyOnly: false })
 
-      const totalItems = parseInt(headers[ 'x-wp-total' ], 10)
-      const totalPages = parseInt(headers[ 'x-wp-totalpages' ], 10)
+      const totalItems = Number(headers['x-wp-total'])
+      const totalPages = Number(headers['x-wp-totalpages'])
 
       if (!totalItems) return []
 
       const queue = [...Array(totalPages)].map((_, i) => i + 1)
 
-      const allData = await pMap(queue, async page => {
+      const allData = await pMap(queue, async (page: number): Promise<any> => {
         try {
           const data = await this.fetch(path, { page }, [], client)
           return this.ensureArrayData(path, data)
         } catch (error) {
           logger.error(error.message)
+          return []
         }
       }, { concurrency: this.options.concurrent })
 
       return allData.flat()
     } catch ({ response }) {
-      logger.warn(`Status ${response.statusCode} fetching ${response.requestUrl}`)
+      logger.warn(`Status ${response.statusCode as string} fetching ${response.requestUrl as string}`)
       return []
     }
   }
 
-  async parseContent (fields) {
+  async parseContent (fields: Record<string, any>): Promise<Record<string, any>> {
     const { links = true, images = true } = this.options.content
     const fieldsToInclude = Array.isArray(links) ? ['content', ...links] : ['content']
 
     for await (const key of fieldsToInclude) {
-      const html = HTMLParser.parse(fields[ key ])
+      const html = HTMLParser(fields[key])
       if (!html) continue
 
       if (links) {
         for (const link of html.querySelectorAll('a')) {
           const originalLink = link.getAttribute('href')
-          const updatedLink = originalLink.replace(this.options.baseUrl, '')
-          link.setAttribute('href', updatedLink)
+          const updatedLink = originalLink?.replace(this.options.baseUrl, '')
+          if (updatedLink) link.setAttribute('href', updatedLink)
         }
       }
 
@@ -395,7 +437,7 @@ class WordPressSource {
         const pipeline = promisify(stream.pipeline)
         for await (const img of html.querySelectorAll('img')) {
           const originalSrc = img.getAttribute('src')
-          if (!originalSrc.includes(this.options.baseUrl)) continue
+          if (!originalSrc?.includes(this.options.baseUrl)) continue
 
           const { pathname } = new URL(originalSrc)
           const fileUrl = pathname.replace('/wp-content', '')
@@ -413,22 +455,22 @@ class WordPressSource {
         }
       }
 
-      fields[ key ] = html.toString()
+      fields[key] = html.toString()
     }
 
     return fields
   }
 
-  async downloadImages (api) {
+  async downloadImages (): Promise<void> {
     if (!this.options.images) return
     const { original = false, folder = '.images/wordpress', cache = true, concurrent = os.cpus().length } = this.options.images
 
-    const imageStore = api._store.getCollection(this.createTypeName(TYPE_ATTACHMENT))
+    const imageStore = this.store.getCollection(this.createTypeName(TYPE_ATTACHMENT))
     const images = imageStore.data()
 
     const pipeline = promisify(stream.pipeline)
 
-    await pMap(images, async image => {
+    await pMap(images, async (image: { id: string, sourceUrl: string }) => {
       const { pathname } = new URL(image.sourceUrl)
       const { name, dir, ext } = path.parse(pathname)
 
@@ -455,27 +497,27 @@ class WordPressSource {
     }, { concurrency: concurrent })
   }
 
-  sanitizeCustomEndpoints () {
+  sanitizeCustomEndpoints (): CustomEndpointOption[] {
     const { customEndpoints } = this.options
     if (!customEndpoints) return []
 
     if (!Array.isArray(customEndpoints)) {
-      throw new Error(logger.error('`customEndpoints` must be an array.'))
+      logger.error(new Error('`customEndpoints` must be an array.'))
     }
 
     for (const endpoint of customEndpoints) {
       if (!endpoint.typeName) {
-        throw new Error(logger.error('Please provide a `typeName` option for all customEndpoints'))
+        logger.error(new Error('Please provide a `typeName` option for all customEndpoints'))
       }
       if (!endpoint.route) {
-        throw new Error(logger.error(`\`route\` option is missing in endpoint ${endpoint.typeName}. Ex: \`apiName/versionNumber/endpointObject\``))
+        logger.error(new Error(`\`route\` option is missing in endpoint ${endpoint.typeName}. Ex: \`apiName/versionNumber/endpointObject\``))
       }
     }
 
     return customEndpoints
   }
 
-  ensureArrayData (url, data) {
+  ensureArrayData (url: string, data: any): any[] {
     if (Array.isArray(data)) return data
 
     try {
@@ -483,20 +525,18 @@ class WordPressSource {
     } catch (err) {
       logger.error(`Failed to fetch ${url} - expected JSON response, but received ${typeof data} type.`)
     }
+    return []
   }
 
-  normalizeFields (fields) {
-    const res = {}
+  normalizeFields (fields: Record<string, any>): Record<string, any> {
+    const normalized = Object.entries(fields)
+      .filter(([key]) => !key.startsWith('_'))
+      .map(([key, value]) => [key, this.normalizeFieldValue(value)])
 
-    for (const key in fields) {
-      if (key.startsWith('_')) continue // skip links and embeds etc
-      res[ camelCase(key) ] = this.normalizeFieldValue(fields[ key ])
-    }
-
-    return res
+    return camelCaseKeys(Object.fromEntries(normalized))
   }
 
-  normalizeFieldValue (value) {
+  normalizeFieldValue (value: Record<string, any>): Record<string, any> | null {
     if (value === null) return null
     if (value === undefined) return null
 
@@ -525,7 +565,7 @@ class WordPressSource {
     return value
   }
 
-  createTypeName (name = '') {
+  createTypeName (name: string = ''): string {
     return camelCase(`${this.options.typeName} ${name}`, { pascalCase: true })
   }
 }
