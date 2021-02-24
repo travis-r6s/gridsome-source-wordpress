@@ -22,6 +22,7 @@ class WordPressSource {
   static defaultOptions () {
     return {
       baseUrl: '',
+      replaceUrl: '',
       apiBase: 'wp-json',
       hostingWPCOM: false,
       perPage: 100,
@@ -30,7 +31,8 @@ class WordPressSource {
       images: false,
       content: true,
       verbose: false,
-      ignoreSSL: false
+      ignoreSSL: false,
+      woocommerce: false
     }
   }
 
@@ -72,6 +74,20 @@ class WordPressSource {
       https: { rejectUnauthorized: !this.options.ignoreSSL }
     })
 
+    if (this.options.woocommerce) {
+      const { consumerKey, consumerSecret } = this.options.woocommerce
+      if (!consumerKey) throw new Error('Missing WooCommerce `consumerKey`.')
+      if (!consumerSecret) throw new Error('Missing WooCommerce `consumerSecret`.')
+
+      const woocommerceBase = this.options.hostingWPCOM ? `https://public-api.wordpress.com/wc/v3/sites/${baseUrl}/` : `${baseUrl}/${options.apiBase}/wc/v3/`
+
+      this.woocommerce = this.client.extend({
+        prefixUrl: woocommerceBase,
+        username: consumerKey,
+        password: consumerSecret
+      })
+    }
+
     api.loadSource(async actions => {
       this.store = actions
 
@@ -84,6 +100,11 @@ class WordPressSource {
       await this.getTaxonomies(actions)
       await this.getPosts(actions)
       await this.getCustomEndpoints(actions)
+
+      if (this.options.woocommerce) {
+        await this.getWooCommerceProducts(actions)
+        await this.getWooCommerceCategories(actions)
+      }
     })
 
     api.onBootstrap(async () => {
@@ -178,7 +199,6 @@ class WordPressSource {
       const posts = actions.getCollection(typeName)
 
       const data = await this.fetchPaged(restBase)
-
       for (const post of data) {
         let fields = this.normalizeFields(post)
 
@@ -232,9 +252,95 @@ class WordPressSource {
     }
   }
 
-  async fetch (url, params = {}, fallbackData = []) {
+  async getWooCommerceProducts (actions) {
+    if (this.options.verbose) logger.info(`Fetching WooCommerce products`)
+
+    const ATTACHMENT_TYPE_NAME = this.createTypeName(TYPE_ATTACHMENT)
+    const CATEGORY_TYPE_NAME = this.createTypeName('ProductCategory')
+    const PRODUCT_TYPE_NAME = this.createTypeName('Product')
+    const PRODUCT_VARIATION_TYPE_NAME = this.createTypeName('ProductVariation')
+
+    const productCollection = actions.addCollection(PRODUCT_TYPE_NAME)
+    productCollection.addReference('groupedProducts', PRODUCT_TYPE_NAME)
+    productCollection.addReference('variations', PRODUCT_VARIATION_TYPE_NAME)
+
+    const productVariationCollection = actions.addCollection(PRODUCT_VARIATION_TYPE_NAME)
+    productVariationCollection.addReference('image', ATTACHMENT_TYPE_NAME)
+
+    const products = await this.fetchPaged('products', this.woocommerce)
+
+    for (const product of products) {
+      let fields = this.normalizeFields(product)
+
+      if (this.options.content) {
+        fields = await this.parseContent(fields)
+      }
+
+      const categories = fields.categories.map(category => actions.createReference(CATEGORY_TYPE_NAME, category.id))
+      const images = fields.images.map(image => actions.createReference(ATTACHMENT_TYPE_NAME, image.id))
+
+      const upsells = fields.upsellIds.map(id => actions.createReference(PRODUCT_TYPE_NAME, id))
+      const crossSells = fields.crossSellIds.map(id => actions.createReference(PRODUCT_TYPE_NAME, id))
+      const related = fields.relatedIds.map(id => actions.createReference(PRODUCT_TYPE_NAME, id))
+
+      productCollection.addNode({
+        ...fields,
+        categories,
+        images,
+        upsells,
+        crossSells,
+        related
+      })
+    }
+
+    if (this.options.verbose) logger.info(`Fetching WooCommerce product variations`)
+
+    const allVariableProducts = products.filter(product => product.type === 'variable')
+    const allVariableProductVariations = await pMap(allVariableProducts, product => this.fetch(`products/${product.id}/variations`, {}, [], this.woocommerce), { concurrency: this.options.concurrent })
+
+    for (const variation of allVariableProductVariations.flat()) {
+      let fields = this.normalizeFields(variation)
+
+      if (this.options.content) {
+        fields = await this.parseContent(fields)
+      }
+
+      productVariationCollection.addNode(fields)
+    }
+  }
+
+  async getWooCommerceCategories (actions) {
+    if (this.options.verbose) logger.info(`Fetching WooCommerce categories`)
+
+    const ATTACHMENT_TYPE_NAME = this.createTypeName(TYPE_ATTACHMENT)
+    const CATEGORY_TYPE_NAME = this.createTypeName('ProductCategory')
+    const PRODUCT_TYPE_NAME = this.createTypeName('Product')
+
+    const productCollection = actions.getCollection(PRODUCT_TYPE_NAME)
+    const categoryCollection = actions.addCollection(CATEGORY_TYPE_NAME)
+    categoryCollection.addReference('parent', CATEGORY_TYPE_NAME)
+
+    const categories = await this.fetchPaged('products/categories', this.woocommerce)
+
+    for (const category of categories) {
+      const fields = this.normalizeFields(category)
+
+      const image = fields.image ? actions.createReference(ATTACHMENT_TYPE_NAME, fields.image.id) : null
+
+      const products = productCollection.data()
+        .filter(({ categories }) => categories.some(({ id }) => id === category.id.toString()))
+        .map(({ id }) => actions.createReference(PRODUCT_TYPE_NAME, id))
+
+      const children = categories.filter(({ parent }) => parent === category.id)
+        .map(({ id }) => actions.createReference(CATEGORY_TYPE_NAME, id))
+
+      categoryCollection.addNode({ ...fields, image, products, children })
+    }
+  }
+
+  async fetch (url, params = {}, fallbackData = [], client = this.client) {
     try {
-      const data = await this.client.get(url, { searchParams: params })
+      const data = await client.get(url, { searchParams: params })
       return data
     } catch ({ response }) {
       logger.warn(`Status ${response.statusCode} fetching ${response.requestUrl}`)
@@ -242,9 +348,9 @@ class WordPressSource {
     }
   }
 
-  async fetchPaged (path) {
+  async fetchPaged (path, client = this.client) {
     try {
-      const { headers } = await this.client.head(path, { resolveBodyOnly: false })
+      const { headers } = await client.head(path, { resolveBodyOnly: false })
 
       const totalItems = parseInt(headers[ 'x-wp-total' ], 10)
       const totalPages = parseInt(headers[ 'x-wp-totalpages' ], 10)
@@ -255,7 +361,7 @@ class WordPressSource {
 
       const allData = await pMap(queue, async page => {
         try {
-          const data = await this.fetch(path, { page })
+          const data = await this.fetch(path, { page }, [], client)
           return this.ensureArrayData(path, data)
         } catch (error) {
           logger.error(error.message)
