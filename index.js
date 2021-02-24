@@ -28,7 +28,8 @@ class WordPressSource {
       concurrent: os.cpus().length,
       typeName: 'WordPress',
       images: false,
-      content: true
+      content: true,
+      verbose: false
     }
   }
 
@@ -97,9 +98,15 @@ class WordPressSource {
   }
 
   async getPostTypes (actions) {
+    if (this.options.verbose) logger.info(`Fetching types`)
+
     const data = await this.fetch('types', {}, {})
 
     for (const type in data) {
+      if (type === 'product' && this.options.woocommerce) continue
+
+      if (this.options.verbose) logger.info(`Fetching ${type}s`)
+
       const options = data[ type ]
 
       this.restBases.posts[ type ] = options.rest_base
@@ -109,6 +116,8 @@ class WordPressSource {
   }
 
   async getUsers (actions) {
+    if (this.options.verbose) logger.info(`Fetching users`)
+
     const data = await this.fetch('users')
 
     const authors = actions.addCollection(this.createTypeName(TYPE_AUTHOR))
@@ -128,9 +137,13 @@ class WordPressSource {
   }
 
   async getTaxonomies (actions) {
+    if (this.options.verbose) logger.info(`Fetching taxonomies`)
+
     const data = await this.fetch('taxonomies', {}, {})
 
     for (const type in data) {
+      if (this.options.verbose) logger.info(`Fetching ${type} taxonomy type`)
+
       const options = data[ type ]
       const taxonomy = actions.addCollection(this.createTypeName(type))
 
@@ -156,6 +169,8 @@ class WordPressSource {
     const ATTACHMENT_TYPE_NAME = this.createTypeName(TYPE_ATTACHMENT)
 
     for (const type in this.restBases.posts) {
+      if (this.options.verbose) logger.info(`Fetching ${type} post type`)
+
       const restBase = this.restBases.posts[ type ]
       const typeName = this.createTypeName(type)
       const posts = actions.getCollection(typeName)
@@ -196,6 +211,8 @@ class WordPressSource {
 
   async getCustomEndpoints (actions) {
     for (const endpoint of this.customEndpoints) {
+      if (this.options.verbose) logger.info(`Fetching custom ${endpoint.typeName} type`)
+
       const customCollection = actions.addCollection(endpoint.typeName)
 
       const data = await this.fetch(endpoint.route)
