@@ -1,15 +1,17 @@
 /* eslint-disable no-prototype-builtins */
-import HTMLParser from 'node-html-parser'
 import camelCase from 'camelcase'
 import camelCaseKeys from 'camelcase-keys'
 import consola from 'consola'
 import fs from 'fs-extra'
 import got, { Got } from 'got'
+import hirestime from 'hirestime'
 import isPlainObject from 'lodash.isplainobject'
+import ora from 'ora'
 import os from 'os'
 import pMap from 'p-map'
 import path from 'path'
 import stream from 'stream'
+import { parse as parseHTML } from 'node-html-parser'
 import { promisify } from 'util'
 
 const TYPE_AUTHOR = 'author'
@@ -167,15 +169,26 @@ class WordPressSource {
     `)
   }
 
+  progress (name: string): { stop: () => void } {
+    const spinner = ora(`Fetching ${name}`)
+    const getElapsed = hirestime()
+
+    if (this.options.verbose) spinner.start()
+
+    return {
+      stop: () => {
+        if (this.options.verbose) spinner.succeed(`Loaded ${name} in ${getElapsed.seconds()}s`)
+      }
+    }
+  }
+
   async getPostTypes (actions: Store): Promise<void> {
-    if (this.options.verbose) logger.info('Fetching types')
+    const progress = this.progress('types')
 
     const data = await this.fetch('types', {}, {})
 
     for (const type in data) {
       if (type === 'product' && this.options.woocommerce) continue
-
-      if (this.options.verbose) logger.info(`Fetching ${type}s`)
 
       const options = data[type]
 
@@ -183,10 +196,12 @@ class WordPressSource {
 
       actions.addCollection(this.createTypeName(type))
     }
+
+    progress.stop()
   }
 
   async getUsers (actions: Store): Promise<void> {
-    if (this.options.verbose) logger.info('Fetching users')
+    const progress = this.progress('users')
 
     const data = await this.fetch('users')
 
@@ -204,15 +219,17 @@ class WordPressSource {
         avatars
       })
     }
+
+    progress.stop()
   }
 
   async getTaxonomies (actions: Store): Promise<void> {
-    if (this.options.verbose) logger.info('Fetching taxonomies')
+    const progress = this.progress('taxonomies')
 
     const data = await this.fetch('taxonomies', {}, {})
 
     for (const type in data) {
-      if (this.options.verbose) logger.info(`Fetching ${type} taxonomy type`)
+      const progress = this.progress(`${type} taxonomy type`)
 
       const options = data[type]
       const taxonomy = actions.addCollection(this.createTypeName(type))
@@ -231,7 +248,11 @@ class WordPressSource {
           count: term.count
         })
       }
+
+      progress.stop()
     }
+
+    progress.stop()
   }
 
   async getPosts (actions: Store): Promise<void> {
@@ -239,7 +260,7 @@ class WordPressSource {
     const ATTACHMENT_TYPE_NAME = this.createTypeName(TYPE_ATTACHMENT)
 
     for (const type in this.restBases.posts) {
-      if (this.options.verbose) logger.info(`Fetching ${type} post type`)
+      const progress = this.progress(`${type} type`)
 
       const restBase = this.restBases.posts[type]
       const typeName = this.createTypeName(type)
@@ -275,12 +296,14 @@ class WordPressSource {
 
         posts.addNode({ ...fields, id: post.id })
       }
+
+      progress.stop()
     }
   }
 
   async getCustomEndpoints (actions: Store): Promise<void> {
     for (const endpoint of this.customEndpoints) {
-      if (this.options.verbose) logger.info(`Fetching custom ${endpoint.typeName} type`)
+      const progress = this.progress(`custom ${endpoint.typeName} type`)
 
       const customCollection = actions.addCollection(endpoint.typeName)
 
@@ -296,11 +319,13 @@ class WordPressSource {
           id: item.id || item.slug
         })
       }
+
+      progress.stop()
     }
   }
 
   async getWooCommerceProducts (actions: Store): Promise<void> {
-    if (this.options.verbose) logger.info('Fetching WooCommerce products')
+    const progressProducts = this.progress('WooCommerce products')
 
     const ATTACHMENT_TYPE_NAME = this.createTypeName(TYPE_ATTACHMENT)
     const CATEGORY_TYPE_NAME = this.createTypeName('ProductCategory')
@@ -340,7 +365,9 @@ class WordPressSource {
       })
     }
 
-    if (this.options.verbose) logger.info('Fetching WooCommerce product variations')
+    progressProducts.stop()
+
+    const progressVariations = this.progress('WooCommerce product variations')
 
     const allVariableProducts = products.filter(product => product.type === 'variable')
     const allVariableProductVariations = await pMap(allVariableProducts, async ({ id }: { id: string }) => await this.fetch(`products/${id}/variations`, {}, [], this.woocommerce), { concurrency: this.options.concurrent })
@@ -354,10 +381,12 @@ class WordPressSource {
 
       productVariationCollection.addNode(fields)
     }
+
+    progressVariations.stop()
   }
 
   async getWooCommerceCategories (actions: Store): Promise<void> {
-    if (this.options.verbose) logger.info('Fetching WooCommerce categories')
+    const progress = this.progress('WooCommerce categories')
 
     const ATTACHMENT_TYPE_NAME = this.createTypeName(TYPE_ATTACHMENT)
     const CATEGORY_TYPE_NAME = this.createTypeName('ProductCategory')
@@ -383,6 +412,8 @@ class WordPressSource {
 
       categoryCollection.addNode({ ...fields, image, products, children })
     }
+
+    progress.stop()
   }
 
   async fetch (url: string, params: Record<string, any> = {}, fallbackData: [] | {} = [], client: Got = this.client): Promise<any> {
@@ -428,7 +459,7 @@ class WordPressSource {
     const fieldsToInclude = Array.isArray(links) ? ['content', ...links] : ['content']
 
     for await (const key of fieldsToInclude) {
-      const html = HTMLParser(fields[key])
+      const html = parseHTML(fields[key])
       if (!html) continue
 
       if (links) {
