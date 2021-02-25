@@ -170,6 +170,7 @@ class WordPressSource {
   }
 
   progress (name: string): { stop: () => void } {
+    // ! possibly use listr to allow stacking spinners/tasks
     const spinner = ora(`Fetching ${name}`)
     const getElapsed = hirestime()
 
