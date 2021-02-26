@@ -14,60 +14,13 @@ import stream from 'stream'
 import { parse as parseHTML } from 'node-html-parser'
 import { promisify } from 'util'
 
+// Types
+import { PluginOptions, CustomEndpointOption, Store, Schema, ImageOptions } from './types'
+
 const TYPE_AUTHOR = 'author'
 const TYPE_ATTACHMENT = 'attachment'
 
 const logger = consola.withTag('gridsome-source-wordpress')
-
-interface CustomEndpointOption {
-  typeName: string
-  route: string
-  normalize: string
-}
-interface ImageOptions {
-  original: boolean
-  folder: string
-  cache: boolean
-  concurrent: number
-}
-
-interface PluginOptions {
-  apiBase: string
-  baseUrl: string
-  concurrent: number
-  content: { links: boolean, images: boolean }
-  customEndpoints: CustomEndpointOption[]
-  hostingWPCOM: boolean
-  ignoreSSL: boolean
-  images: ImageOptions | boolean
-  perPage: number
-  typeName: string
-  verbose: boolean
-  woocommerce: { consumerKey: string, consumerSecret: string } | null
-}
-
-interface Store {
-  addCollection: (typeName: string) => Collection
-  addSchemaTypes: (schema: string) => void
-  createReference: (typeName: string, id: string) => NodeReference
-  getCollection: (typeName: string) => Collection
-}
-
-interface Collection {
-  addNode: (node: any) => void
-  addReference: (field: string, typeName: string) => void
-  data: () => any[]
-  updateNode: (node: any) => void
-}
-
-interface NodeReference {
-  id: string
-  typeName: string
-}
-
-interface Schema {
-  addSchemaTypes: (schema: string | string[]) => void
-}
 
 class WordPressSource {
   static defaultOptions (): PluginOptions {
