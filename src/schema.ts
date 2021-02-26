@@ -63,8 +63,8 @@ export function createSchema ({ addSchemaTypes }: Schema, { createTypeName, wooc
         id: Int
         name: String
         position: Int
-        visible: Bool
-        variation: Bool
+        visible: Boolean
+        variation: Boolean
         options: [String]
       }
       type ${ATTRIBUTE_TYPE_NAME} {
@@ -81,7 +81,7 @@ export function createSchema ({ addSchemaTypes }: Schema, { createTypeName, wooc
         dateModified: Date
         type: String
         status: String
-        featured: Bool
+        featured: Boolean
         catalogVisibility: String
         description: String
         shortDescription: String
@@ -89,9 +89,9 @@ export function createSchema ({ addSchemaTypes }: Schema, { createTypeName, wooc
         price: String
         regularPrice: String
         salePrice: String
-        onSale: Bool
-        purchaseable: Bool
-        backordersAllowed: Bool
+        onSale: Boolean
+        purchaseable: Boolean
+        backordersAllowed: Boolean
         weight: String
         menuOrder: Int
         attributes: [${ATTRIBUTE_TYPE_NAME}]
