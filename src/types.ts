@@ -46,4 +46,7 @@ export interface NodeReference {
 
 export interface Schema {
   addSchemaTypes: (schema: string | string[]) => void
+  schema: {
+    createObjectType: (options: { name: string, fields: Record<string, string>, extensions?: Record<string, string | boolean>, interfaces?: string[] }) => void
+  }
 }

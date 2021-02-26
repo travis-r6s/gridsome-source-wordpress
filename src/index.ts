@@ -14,6 +14,9 @@ import stream from 'stream'
 import { parse as parseHTML } from 'node-html-parser'
 import { promisify } from 'util'
 
+// Helpers
+import { createSchema } from './schema'
+
 // Types
 import { PluginOptions, CustomEndpointOption, Store, Schema, ImageOptions } from './types'
 
@@ -113,20 +116,12 @@ class WordPressSource {
     })
 
     api.createSchema((schema: Schema) => {
-      this.addSchemaTypes(schema)
+      createSchema(schema, { createTypeName: this.createTypeName.bind(this), woocommerce: !!this.options.woocommerce })
     })
 
     api.onBootstrap(async () => {
       if (this.options.images) await this.downloadImages()
     })
-  }
-
-  addSchemaTypes (schema: Schema): void {
-    schema.addSchemaTypes(`
-      type ${this.createTypeName(TYPE_ATTACHMENT)} implements Node @infer {
-        downloaded: Image
-      }
-    `)
   }
 
   progress (name: string): { stop: () => void } {
