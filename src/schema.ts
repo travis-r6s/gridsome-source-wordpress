@@ -52,11 +52,11 @@ export function createSchema ({ addSchemaTypes }: Schema, { createTypeName, wooc
   `)
 
   if (woocommerce) {
-    const ATTRIBUTES_TYPE_NAME = createTypeName('WooCommerceAttributes')
-    const ATTRIBUTE_TYPE_NAME = createTypeName('WooCommerceAttribute')
-    const PRODUCT_CATEGORY_TYPE_NAME = createTypeName('WooCommerceProductCategory')
-    const PRODUCT_TYPE_NAME = createTypeName('WooCommerceProduct')
-    const PRODUCT_VARIATION_TYPE_NAME = createTypeName('WooCommerceProductVariation')
+    const ATTRIBUTES_TYPE_NAME = createTypeName('ProductAttributes')
+    const ATTRIBUTE_TYPE_NAME = createTypeName('VariationAttribute')
+    const PRODUCT_CATEGORY_TYPE_NAME = createTypeName('ProductCategory')
+    const PRODUCT_TYPE_NAME = createTypeName('Product')
+    const PRODUCT_VARIATION_TYPE_NAME = createTypeName('ProductVariation')
 
     addSchemaTypes(`
       type ${ATTRIBUTES_TYPE_NAME} {
