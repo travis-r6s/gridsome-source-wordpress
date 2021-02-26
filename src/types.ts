@@ -10,11 +10,11 @@ export interface ImageOptions {
   concurrent: number
 }
 
-export interface PluginOptions {
+export interface ConfigOptions {
   apiBase: string
   baseUrl: string
   concurrent: number
-  content: { links: boolean, images: boolean }
+  content: { links: boolean, images: boolean } | boolean
   customEndpoints: CustomEndpointOption[]
   hostingWPCOM: boolean
   ignoreSSL: boolean
@@ -23,6 +23,10 @@ export interface PluginOptions {
   typeName: string
   verbose: boolean
   woocommerce: { consumerKey: string, consumerSecret: string } | null
+}
+
+export interface PluginOptions extends ConfigOptions {
+  content: { links: boolean, images: boolean }
 }
 
 export interface Store {

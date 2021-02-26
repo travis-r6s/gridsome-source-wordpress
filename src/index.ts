@@ -18,7 +18,7 @@ import { promisify } from 'util'
 import { createSchema } from './schema'
 
 // Types
-import { PluginOptions, CustomEndpointOption, Store, Schema, ImageOptions } from './types'
+import { PluginOptions, ConfigOptions, CustomEndpointOption, Store, Schema, ImageOptions } from './types'
 
 const TYPE_AUTHOR = 'author'
 const TYPE_ATTACHMENT = 'attachment'
@@ -26,7 +26,7 @@ const TYPE_ATTACHMENT = 'attachment'
 const logger = consola.withTag('gridsome-source-wordpress')
 
 class WordPressSource {
-  static defaultOptions (): PluginOptions {
+  static defaultOptions (): ConfigOptions {
     return {
       apiBase: 'wp-json',
       baseUrl: '',
@@ -67,6 +67,11 @@ class WordPressSource {
     if (options.perPage > 100 || options.perPage < 1) {
       options.perPage = 100
       logger.warn('`perPage` cannot be more than 100 or less than 1 - defaulting to 100.')
+    }
+
+    if (typeof options.content === 'boolean') {
+      if (options.content) options.content = { images: true, links: true }
+      else options.content = { images: false, links: false }
     }
 
     const baseUrl = options.baseUrl.replace(/\/$/, '')
@@ -411,7 +416,7 @@ class WordPressSource {
   }
 
   async parseContent (fields: Record<string, any>): Promise<Record<string, any>> {
-    const { links = true, images = true } = this.options.content
+    const { links, images } = this.options.content
     const fieldsToInclude = Array.isArray(links) ? ['content', ...links] : ['content']
 
     for await (const key of fieldsToInclude) {
