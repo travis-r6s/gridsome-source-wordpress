@@ -65,6 +65,10 @@ interface NodeReference {
   typeName: string
 }
 
+interface Schema {
+  addSchemaTypes: (schema: string | string[]) => void
+}
+
 class WordPressSource {
   static defaultOptions (): PluginOptions {
     return {
@@ -142,7 +146,6 @@ class WordPressSource {
       logger.info(`Loading data from ${this.options.baseUrl}`)
 
       this.store = actions
-      this.addSchemaTypes(actions)
 
       await this.getPostTypes(actions)
       await this.getUsers(actions)
@@ -156,13 +159,17 @@ class WordPressSource {
       }
     })
 
+    api.createSchema((schema: Schema) => {
+      this.addSchemaTypes(schema)
+    })
+
     api.onBootstrap(async () => {
       if (this.options.images) await this.downloadImages()
     })
   }
 
-  addSchemaTypes (actions: Store): void {
-    actions.addSchemaTypes(`
+  addSchemaTypes (schema: Schema): void {
+    schema.addSchemaTypes(`
       type ${this.createTypeName(TYPE_ATTACHMENT)} implements Node @infer {
         downloaded: Image
       }
