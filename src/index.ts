@@ -200,14 +200,8 @@ class WordPressSource {
       const terms = await this.fetchPaged(options.rest_base)
 
       for (const term of terms) {
-        taxonomy.addNode({
-          id: term.id,
-          title: term.name,
-          slug: term.slug,
-          content: term.description,
-          meta: term.meta,
-          count: term.count
-        })
+        const fields = this.normalizeFields(term)
+        taxonomy.addNode(fields)
       }
 
       progress.stop()
