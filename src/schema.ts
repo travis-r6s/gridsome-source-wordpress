@@ -30,6 +30,7 @@ export function createSchema ({ addSchemaTypes }: Schema, { createTypeName, wooc
       author: ${AUTHOR_TYPE_NAME}
       featuredMedia: ${ATTACHMENT_TYPE_NAME}
       categories: [${CATEGORY_TYPE_NAME}]
+      tags: [${TAG_TYPE_NAME}]
     }
 
     type ${CATEGORY_TYPE_NAME} implements Node @infer {
