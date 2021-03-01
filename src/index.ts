@@ -288,7 +288,6 @@ class WordPressSource {
     const PRODUCT_VARIATION_TYPE_NAME = this.createTypeName('ProductVariation')
 
     const productCollection = actions.addCollection(PRODUCT_TYPE_NAME)
-    productCollection.addReference('groupedProducts', PRODUCT_TYPE_NAME)
     productCollection.addReference('variations', PRODUCT_VARIATION_TYPE_NAME)
 
     const productVariationCollection = actions.addCollection(PRODUCT_VARIATION_TYPE_NAME)
@@ -306,17 +305,19 @@ class WordPressSource {
       const categories = fields.categories.map(({ id }: { id: string }) => actions.createReference(CATEGORY_TYPE_NAME, id))
       const images = fields.images.map(({ id }: { id: string }) => actions.createReference(ATTACHMENT_TYPE_NAME, id))
 
-      const upsells = fields.upsellIds.map((id: string) => actions.createReference(PRODUCT_TYPE_NAME, id))
       const crossSells = fields.crossSellIds.map((id: string) => actions.createReference(PRODUCT_TYPE_NAME, id))
+      const grouped = fields.groupedProducts.map((id: string) => actions.createReference(PRODUCT_TYPE_NAME, id))
       const related = fields.relatedIds.map((id: string) => actions.createReference(PRODUCT_TYPE_NAME, id))
+      const upsells = fields.upsellIds.map((id: string) => actions.createReference(PRODUCT_TYPE_NAME, id))
 
       productCollection.addNode({
         ...fields,
         categories,
         images,
-        upsells,
         crossSells,
-        related
+        grouped,
+        related,
+        upsells
       })
     }
 
