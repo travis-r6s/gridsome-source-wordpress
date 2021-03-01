@@ -94,7 +94,7 @@ export function createSchema ({ addSchemaTypes }: Schema, { createTypeName, wooc
         backordersAllowed: Boolean
         weight: String
         menuOrder: Int
-        attributes: [${ATTRIBUTE_TYPE_NAME}]
+        attributes: [${ATTRIBUTES_TYPE_NAME}]
         defaultAttributes: [${ATTRIBUTE_TYPE_NAME}]
         tags: [${TAG_TYPE_NAME}]
         upsells: [${PRODUCT_TYPE_NAME}]
