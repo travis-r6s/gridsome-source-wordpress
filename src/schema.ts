@@ -5,7 +5,7 @@ export function createSchema ({ addSchemaTypes }: Schema, { createTypeName, wooc
   const AUTHOR_TYPE_NAME = createTypeName('Author')
   const CATEGORY_TYPE_NAME = createTypeName('Category')
   const POST_TYPE_NAME = createTypeName('Post')
-  const TAG_TYPE_NAME = createTypeName('Tag')
+  const TAG_TYPE_NAME = createTypeName('PostTag')
 
   addSchemaTypes(`
     type ${ATTACHMENT_TYPE_NAME} implements Node @infer {
