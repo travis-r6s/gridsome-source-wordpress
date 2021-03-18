@@ -25,13 +25,15 @@ const TYPE_ATTACHMENT = 'attachment'
 
 const logger = consola.withTag('gridsome-source-wordpress')
 
+const contentDefaults = { images: false, links: true, titles: true }
+
 class WordPressSource {
   static defaultOptions (): ConfigOptions {
     return {
       apiBase: 'wp-json',
       baseUrl: '',
       concurrent: os.cpus().length,
-      content: { images: false, links: true },
+      content: contentDefaults,
       customEndpoints: [],
       hostingWPCOM: false,
       ignoreSSL: false,
@@ -70,14 +72,14 @@ class WordPressSource {
     }
 
     if (typeof options.content === 'boolean') {
-      if (options.content) options.content = { images: true, links: true }
-      else options.content = { images: false, links: false }
+      if (options.content) options.content = { images: true, links: true, titles: true }
+      else options.content = { images: false, links: false, titles: false }
     }
 
     const baseUrl = options.baseUrl.replace(/\/$/, '')
     const clientBase = options.hostingWPCOM ? `https://public-api.wordpress.com/wp/v2/sites/${baseUrl}/` : `${baseUrl}/${options.apiBase}/wp/v2/`
 
-    this.options = { ...options, baseUrl }
+    this.options = { ...options, baseUrl, content: { ...contentDefaults, ...options.content } }
     this.customEndpoints = this.sanitizeCustomEndpoints()
     this.store = api._app.store
 
