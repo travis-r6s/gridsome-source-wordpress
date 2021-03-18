@@ -26,7 +26,7 @@ const TYPE_ATTACHMENT = 'attachment'
 
 const logger = consola.withTag('gridsome-source-wordpress')
 
-const contentDefaults = { images: false, links: true, titles: true }
+const contentDefaults = { images: false, links: true, entities: true }
 
 class WordPressSource {
   static defaultOptions (): ConfigOptions {
@@ -73,8 +73,8 @@ class WordPressSource {
     }
 
     if (typeof options.content === 'boolean') {
-      if (options.content) options.content = { images: true, links: true, titles: true }
-      else options.content = { images: false, links: false, titles: false }
+      if (options.content) options.content = { images: true, links: true, entities: true }
+      else options.content = { images: false, links: false, entities: false }
     }
 
     const baseUrl = options.baseUrl.replace(/\/$/, '')
@@ -561,8 +561,7 @@ class WordPressSource {
     }
 
     if (typeof value === 'string' && key) {
-      const titleKeys = ['title', 'name']
-      if (this.options.content.titles && titleKeys.includes(key)) {
+      if (this.options.content.entities) {
         return decodeEntities(value, { level: 'html5' })
       }
     }
