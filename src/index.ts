@@ -11,6 +11,7 @@ import os from 'os'
 import pMap from 'p-map'
 import path from 'path'
 import stream from 'stream'
+import { decode as decodeEntities } from 'html-entities'
 import { parse as parseHTML } from 'node-html-parser'
 import { promisify } from 'util'
 
@@ -525,14 +526,13 @@ class WordPressSource {
   normalizeFields (fields: Record<string, any>): Record<string, any> {
     const normalized = Object.entries(fields)
       .filter(([key]) => !key.startsWith('_'))
-      .map(([key, value]) => [key, this.normalizeFieldValue(value)])
+      .map(([key, value]) => [key, this.normalizeFieldValue(value, key)])
 
     return camelCaseKeys(Object.fromEntries(normalized))
   }
 
-  normalizeFieldValue (value: Record<string, any>): Record<string, any> | null {
-    if (value === null) return null
-    if (value === undefined) return null
+  normalizeFieldValue (value: Record<string, any>, key?: string): Record<string, any> | string | null {
+    if (!value) return value
 
     if (Array.isArray(value)) {
       return value.map(v => this.normalizeFieldValue(v))
@@ -544,16 +544,27 @@ class WordPressSource {
         const id = value.ID || value.id
 
         return this.store.createReference(typeName, id)
-      } else if (value.filename && (value.ID || value.id)) {
+      }
+
+      if (value.filename && (value.ID || value.id)) {
         const typeName = this.createTypeName(TYPE_ATTACHMENT)
         const id = value.ID || value.id
 
         return this.store.createReference(typeName, id)
-      } else if (value.hasOwnProperty('rendered')) {
-        return value.rendered
+      }
+
+      if (value.hasOwnProperty('rendered')) {
+        return this.normalizeFieldValue(value.rendered, key)
       }
 
       return this.normalizeFields(value)
+    }
+
+    if (typeof value === 'string' && key) {
+      const titleKeys = ['title', 'name']
+      if (this.options.content.titles && titleKeys.includes(key)) {
+        return decodeEntities(value, { level: 'html5' })
+      }
     }
 
     return value

@@ -1068,6 +1068,11 @@ hosted-git-info@^2.1.4:
   resolved "https://registry.yarnpkg.com/hosted-git-info/-/hosted-git-info-2.8.8.tgz#7539bd4bc1e0e0a895815a2e0262420b12858488"
   integrity sha512-f/wzC2QaWBs7t9IYqB4T3sR1xviIViXJRJTWBlx2Gf3g0Xi5vI7Yy4koXQ1c9OYDGHN9sBy1DQ2AB8fqZBWhUg==
 
+html-entities@^2.1.1:
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/html-entities/-/html-entities-2.1.1.tgz#faa5fc521e2d18499627835d22be3554c202208f"
+  integrity sha512-HjNLgm9Ba8zKd6NDMkXa0mMPn3eDUxOUnEIm/qy2Rm6rnqRHgI9DpMYIv1Fndu8haUmfMQHNYNrlNKmdU8GMnQ==
+
 http-cache-semantics@^4.0.0:
   version "4.1.0"
   resolved "https://registry.yarnpkg.com/http-cache-semantics/-/http-cache-semantics-4.1.0.tgz#49e91c5cbf36c9b94bcfcd71c23d5249ec74e390"

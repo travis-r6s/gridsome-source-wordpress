@@ -14,7 +14,7 @@ export interface ConfigOptions {
   apiBase: string
   baseUrl: string
   concurrent: number
-  content: { links: boolean, images: boolean } | boolean
+  content: { links: boolean, images: boolean, titles: boolean } | boolean
   customEndpoints: CustomEndpointOption[]
   hostingWPCOM: boolean
   ignoreSSL: boolean
@@ -26,7 +26,7 @@ export interface ConfigOptions {
 }
 
 export interface PluginOptions extends ConfigOptions {
-  content: { links: boolean, images: boolean }
+  content: { links: boolean, images: boolean, titles: boolean }
 }
 
 export interface Store {
