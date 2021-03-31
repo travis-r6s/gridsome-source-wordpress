@@ -12,7 +12,7 @@ export function createSchema ({ addSchemaTypes }: Schema, { createTypeName, wooc
       downloaded: Image
     }
 
-    type ${TAG_TYPE_NAME} {
+    type ${TAG_TYPE_NAME} implements Node @infer {
       id: Int
       name: String
       slug: String
