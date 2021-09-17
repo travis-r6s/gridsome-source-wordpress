@@ -1,11 +1,11 @@
-# @gridsome/source-wordpress
+# @travisreynolds/gridsome-source-wordpress
 
 > WordPress source for Gridsome. This package is under development and
 API might change before v1 is released.
 
 ## Install
-- `yarn add @gridsome/source-wordpress`
-- `npm install @gridsome/source-wordpress`
+- `yarn add @travisreynolds/gridsome-source-wordpress`
+- `npm install @travisreynolds/gridsome-source-wordpress`
 
 ## Usage
 
@@ -13,7 +13,7 @@ API might change before v1 is released.
 module.exports = {
   plugins: [
     {
-      use: '@gridsome/source-wordpress',
+      use: '@travisreynolds/gridsome-source-wordpress',
       options: {
         baseUrl: '<WEBSITE_URL>', // required
         apiBase: 'wp-json',
@@ -34,7 +34,7 @@ module.exports = {
 |-|-|-|
 | `baseUrl` | The base URL of your WordPress instance. This is required, and must include the protocol used. |  |
 | `apiBase` | The API base for your WordPress instance - this may change if you are using wordpress.com for example. | `wp-json` |
-| `typeName` | The downloader will skip images that already exist locally, but you can force it to download every image if needed. | `false` |
+| `typeName` | The base name used to prefix all created types. | `WordPress` |
 | `hostingWPCOM` | Change this to `true` if your site is hosted on wordpress.com, and set `baseUrl` to your site name (e.g. `staticsitegeneration.wordpress.com`) | `false` |
 | `perPage` | The amount of items that will be fetched per API call - minimum of 1, and maximum of 100. | `100` |
 | `concurrent` | The amount of API calls that will run at once. | `8` |
