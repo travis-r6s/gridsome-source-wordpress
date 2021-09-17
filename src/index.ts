@@ -394,7 +394,7 @@ class WordPressSource {
 
       if (!totalItems) return []
 
-      const queue = [...Array(totalPages)].map((_, i) => i + 1)
+      const queue = Array.from({ length: totalPages }, (_, i) => i + 1)
 
       const allData = await pMap(queue, async (page: number): Promise<any> => {
         try {
