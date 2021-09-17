@@ -3,7 +3,7 @@ import camelCase from 'camelcase'
 import camelCaseKeys from 'camelcase-keys'
 import consola from 'consola'
 import fs from 'fs-extra'
-import got, { Got } from 'got'
+import got, { Got, Response } from 'got'
 import hirestime from 'hirestime'
 import isPlainObject from 'lodash.isplainobject'
 import ora from 'ora'
@@ -379,8 +379,9 @@ class WordPressSource {
     try {
       const data = await client.get(url, { searchParams: params })
       return data
-    } catch ({ response }) {
-      logger.warn(`Status ${response.statusCode as string} fetching ${response.requestUrl as string}`)
+    } catch (error) {
+      const { response } = error as Error & { response: Response }
+      logger.warn(`Status ${response.statusCode} fetching ${response.requestUrl}`)
       return fallbackData
     }
   }
@@ -401,14 +402,15 @@ class WordPressSource {
           const data = await this.fetch(path, { page }, [], client)
           return this.ensureArrayData(path, data)
         } catch (error) {
-          logger.error(error.message)
+          logger.error((error as Error).message)
           return []
         }
       }, { concurrency: this.options.concurrent })
 
       return allData.flat()
-    } catch ({ response }) {
-      logger.warn(`Status ${response.statusCode as string} fetching ${response.requestUrl as string}`)
+    } catch (error) {
+      const { response } = error as Error & { response: Response }
+      logger.warn(`Status ${response.statusCode} fetching ${response.requestUrl}`)
       return []
     }
   }
@@ -487,7 +489,7 @@ class WordPressSource {
 
         return imageStore.updateNode(updatedNode)
       } catch (error) {
-        logger.error(error.message)
+        logger.error((error as Error).message)
       }
     }, { concurrency: concurrent })
   }
