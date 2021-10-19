@@ -42,7 +42,8 @@ class WordPressSource {
       perPage: 100,
       typeName: 'WordPress',
       verbose: false,
-      woocommerce: null
+      woocommerce: null,
+      got: {}
     }
   }
 
@@ -85,6 +86,7 @@ class WordPressSource {
     this.store = api._app.store
 
     this.client = got.extend({
+      ...(options.got || {}),
       prefixUrl: clientBase,
       searchParams: { per_page: this.options.perPage },
       resolveBodyOnly: true,

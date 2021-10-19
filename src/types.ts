@@ -1,3 +1,5 @@
+import { ExtendOptions } from 'got'
+
 export interface CustomEndpointOption {
   typeName: string
   route: string
@@ -23,6 +25,7 @@ export interface ConfigOptions {
   typeName: string
   verbose: boolean
   woocommerce: { consumerKey: string, consumerSecret: string } | null
+  got: ExtendOptions
 }
 
 export interface PluginOptions extends ConfigOptions {
